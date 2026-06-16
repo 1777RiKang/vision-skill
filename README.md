@@ -1,68 +1,114 @@
 # Add Eyes Skills 👁️
 
-> **给纯文本模型装上眼睛** — 让 DeepSeek V4 Flash/Pro 等不支持多模态的模型也能"看懂"图片  
+> **给纯文本模型装上眼睛** — 让 DeepSeek V4、MiMo V2.5 Pro 等不支持多模态的模型也能"看懂"图片  
 > Vision bridge for text-only LLMs — let DeepSeek V4, etc. "see" images via external vision APIs
 
 [![Reasonix Skill](https://img.shields.io/badge/Reasonix-Skill-blue)](#)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-green)](mimo_vision.py)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
+---
+
 ## 为什么需要这个？
 
-你的 AI 模型如果是纯文本模型（例如 **DeepSeek V4 Flash**、**V4 Pro**），它**看不懂图片**。
-用户贴了截图、报错、设计稿……模型都只能干瞪眼。
+你的 AI 模型如果是纯文本模型（例如 **DeepSeek V4 Flash**、**MiMo V2.5 Pro**），它**看不懂图片**。
 
-**Add Eyes Skills** 的解决思路：
+用户贴了截图、报错、设计稿……模型都只能说"我无法查看图片"。
+
+**Add Eyes Skills** 的解决思路——**能力融合**：
 
 ```
-用户贴图 ──→ 纯文本模型看不见 ──→ Skill 编码图片
-    ──→ 调用外部视觉 API ──→ 获得文字描述
-    ──→ 纯文本模型拿到描述，「看懂了」
+纯文本模型（强推理） + 简单多模态模型（能看图）
+    ↓ 融合
+既能看图，又能推理
 ```
 
-你只是**借用了外部视觉模型的眼睛**，然后用自己强大的语言能力来理解、分析、处理图片内容。
+---
+
+## 核心功能
+
+| 功能 | 说明 |
+|------|------|
+| 🚀 **Always-on 模式** | 注入系统提示词，AI 永远不会说"我看不见图片" |
+| 🔍 **自动检测后端** | 启动时自动检测可用的视觉后端，无需手动配置 |
+| 🧠 **智能提问** | 根据对话上下文自动优化提问（代码/UI/数据/错误场景） |
+| 🎯 **自动路由** | 自动检测消息是否需要视觉处理 |
+| 🖼️ **13 个视觉后端** | 云端 + 本地，覆盖 MiMo/GPT/Claude/Gemini/Ollama |
+| 🏠 **本地模型** | Ollama (MiniCPM-V/LLaVA/Moondream)，免费+隐私 |
+| 📝 **OCR 降级** | 无 API Key 时自动降级为 OCR 文字提取 |
+| 🔄 **自动重试** | 指数退避重试，5xx/网络错误自动恢复 |
+| 🌐 **多平台** | Reasonix、Claude Code、Cursor、GitHub Copilot |
+| 🔒 **零依赖** | 纯 Python 标准库，无需 pip install |
+
+---
 
 ## 快速开始
 
-### 1. 安装 & 配置
+### 1. 克隆仓库
 
 ```bash
 git clone https://github.com/1777RiKang/add-eyes-skills.git
 cd add-eyes-skills
 ```
 
-### 2. 配置视觉后端 Key（至少一个）
+### 2. 配置视觉后端（至少一个）
+
+**方案 A：本地模型（推荐，免费，隐私）**
 
 ```bash
-# ⭐ 推荐：MiMo（性价比高，国内直连）
+# 安装 Ollama：https://ollama.ai
+ollama pull minicpm-v
+```
+
+**方案 B：云端 API**
+
+```bash
+# MiMo（推荐，国内直连，性价比高）
 # PowerShell:
 $env:MIMO_API_KEY = 'your-mimo-key'
 # bash:
 export MIMO_API_KEY='your-mimo-key'
 
-# 或 OpenAI / Claude / Gemini（任选其一）
-$env:OPENAI_API_KEY = 'your-openai-key'
+# 或 OpenAI
+export OPENAI_API_KEY='your-openai-key'
+
+# 或 Claude
+export ANTHROPIC_API_KEY='your-anthropic-key'
 ```
 
-### 3. 测试脚本
+### 3. 检测可用后端
 
 ```bash
-python mimo_vision.py path/to/test.png "测试：这是什么？"
+python mimo_vision.py --detect-backends
 ```
 
-### 4. 安装到你的 AI 编程助手
+输出示例：
+```json
+{
+  "available": ["ollama:minicpm-v", "mimo-v2.5"],
+  "recommended": "ollama:minicpm-v"
+}
+```
+
+### 4. 测试
+
+```bash
+python mimo_vision.py test.png "描述这张图片"
+```
+
+### 5. 安装到你的 AI 编程助手
+
+<details open>
+<summary><b>Reasonix</b></summary>
+
+```bash
+cp SKILL.md ~/.reasonix/skills/add-eyes.md
+cp ALWAYS_ON.md ~/.reasonix/skills/ALWAYS_ON.md
+```
+</details>
 
 <details>
-<summary><b>Claude Code</b> (Anthropic)</summary>
-
-将 `platforms/claude-code/SKILL.md` 复制到项目的 `.claude/skills/vision/` 目录：
-
-```bash
-mkdir -p .claude/skills/vision
-cp platforms/claude-code/SKILL.md .claude/skills/vision/
-```
-
-或安装到用户级（所有项目生效）：
+<summary><b>Claude Code</b></summary>
 
 ```bash
 mkdir -p ~/.claude/skills/vision
@@ -71,47 +117,23 @@ cp platforms/claude-code/SKILL.md ~/.claude/skills/vision/
 </details>
 
 <details>
-<summary><b>Cursor</b> (Anysphere)</summary>
-
-将 `.cursor/rules/mimo-vision.md` 复制到项目的 `.cursor/rules/` 目录：
+<summary><b>Cursor</b></summary>
 
 ```bash
 mkdir -p .cursor/rules
 cp .cursor/rules/mimo-vision.md .cursor/rules/
 ```
-
 </details>
 
 <details>
-<summary><b>GitHub Copilot</b> (Microsoft)</summary>
-
-将 `.github/copilot-instructions.md` 复制到项目的 `.github/` 目录：
+<summary><b>GitHub Copilot</b></summary>
 
 ```bash
-mkdir -p .github
 cp .github/copilot-instructions.md .github/
 ```
 </details>
 
-<details>
-<summary><b>Reasonix</b></summary>
-
-```bash
-install-capability source="./add-eyes-skills"
-```
-</details>
-
-<details open>
-<summary><b>通用 CLI / 其他 Agent 平台</b></summary>
-
-脚本本身纯 Python 标准库，可直接在任意 Agent 中调用：
-
-```bash
-python "<repo路径>/mimo_vision.py" "<图片路径>" "<问题>" --model <后端>
-```
-
-只需要在你的 Agent 系统提示里加入类似指令即可，参考各平台的 Skill 定义文件。
-</details>
+---
 
 ## 用法
 
@@ -124,108 +146,138 @@ python mimo_vision.py screenshot.png
 # 问具体问题
 python mimo_vision.py screenshot.png "这个页面有哪些UI问题？"
 
-# 使用其他模型
+# 使用其他后端
 python mimo_vision.py diagram.png "解释这张架构图" --model gpt-4o
 
-# 列出所有支持的模型
-python mimo_vision.py --list-models
+# 使用本地模型
+python mimo_vision.py screenshot.png "分析这个界面" --model ollama:minicpm-v
 ```
 
-### 通过 Reasonix AI Agent 使用
-
-安装成功后，当你在 Reasonix 中粘贴图片时，Agent 会自动识别并使用此 Skill 分析图片。你也可以直接说：
-
-- "帮我看这张截图"
-- "分析这个页面的布局"
-- "用 GPT-4o 看这张架构图"
-- "这个 UI 有什么问题？"
-
-## 环境变量参考
-
-| 变量 | 用途 | 视觉后端 |
-|------|------|----------|
-| `MIMO_API_KEY` | ⭐ 小米 MiMo (推荐) | `mimo-v2.5` |
-| `MIMO_MODEL` | 切换默认视觉后端 | 所有 |
-| `MIMO_BASE_URL` | 自定义 OpenAI 兼容地址 | 自定义后端 |
-| `OPENAI_API_KEY` | OpenAI | `gpt-4o`, `gpt-4-turbo` |
-| `OPENAI_BASE_URL` | 自定义 OpenAI 端点 | 代理/中转 |
-| `ANTHROPIC_API_KEY` | Anthropic Claude | Claude 系列 |
-| `ANTHROPIC_BASE_URL` | 自定义 Anthropic 端点 | 代理/中转 |
-| `GEMINI_API_KEY` | Google Gemini | Gemini 系列 |
-| `GEMINI_BASE_URL` | 自定义 Gemini 端点 | 代理/中转 |
-
-## 添加自定义视觉后端
-
-如果你有其他 OpenAI 兼容的视觉 API（如通过中转站代理），只需：
-
-1. 设置环境变量指向你的端点：
-   ```bash
-   export MIMO_BASE_URL="https://your-proxy.com/v1/chat/completions"
-   export MIMO_API_KEY="your-proxy-key"
-   ```
-2. 运行时指定后端模型名：
-   ```bash
-   export MIMO_MODEL="your-vision-model-name"
-   python mimo_vision.py image.png "描述这张图片"
-   ```
-
-## OCR 降级（无 API Key 时使用）
-
-当没有任何视觉 API Key 时，可以启用 OCR 模式提取图片中的文字：
+### 智能提问（带上下文）
 
 ```bash
-# 安装 OCR 依赖（可选，不装也能用，只是少 OCR 功能）
+# 根据对话上下文自动优化提问
+python mimo_vision.py screenshot.png "帮我看看" --context "我在调试登录功能，出现了 TypeError"
+# → 自动问："请分析这张图片中的错误信息、异常堆栈或问题描述..."
+```
+
+### 自动路由
+
+```bash
+# 检测消息是否需要视觉处理
+python mimo_vision.py --auto-route "帮我看看这个截图 @.reasonix/attachments/screenshot.png"
+# → {"needs_vision": true, "image_paths": [...], "question": "..."}
+```
+
+### 自动检测后端
+
+```bash
+# 检测所有可用的视觉后端
+python mimo_vision.py --detect-backends
+```
+
+### OCR 降级（无 API Key 时）
+
+```bash
+# 安装 OCR 依赖（可选）
 pip install pillow pytesseract easyocr
 
 # 使用 OCR 模式
 python mimo_vision.py screenshot.png --ocr
 ```
 
-**OCR 降级顺序：**
+---
 
-| 优先级 | 工具 | 安装 | 说明 |
-|-------|------|------|------|
-| 1 | easyocr | `pip install easyocr` | 纯 Python，离线，首次下载模型 (~200MB) |
-| 2 | pytesseract | `pip install pytesseract` + 系统 tesseract | 需要额外装系统包 |
-| 3 | Pillow | `pip install pillow` | 只能读取图片元信息（格式/尺寸/EXIF） |
+## 支持的视觉后端
 
-**注意：** OCR 只能提取文字，不能"理解"图片内容。建议优先使用视觉 API（配 Key），OCR 作为最后的兜底方案。
+| 后端 | 类型 | 需要 Key | 推荐场景 |
+|------|------|---------|----------|
+| **ollama:minicpm-v** | 本地 | 🆓 无需 | ⭐ 日常使用，隐私优先 |
+| **ollama:llava** | 本地 | 🆓 无需 | 备选本地模型 |
+| **ollama:moondream** | 本地 | 🆓 无需 | 轻量快速 |
+| **mimo-v2.5** | 云端 | `MIMO_API_KEY` | 国内用户，性价比高 |
+| **gpt-4o** | 云端 | `OPENAI_API_KEY` | 最高质量需求 |
+| **gpt-4-turbo** | 云端 | `OPENAI_API_KEY` | GPT-4o 备选 |
+| **claude-3-5-sonnet** | 云端 | `ANTHROPIC_API_KEY` | 细节理解出色 |
+| **claude-sonnet-4-6** | 云端 | `ANTHROPIC_API_KEY` | 最新 Claude |
+| **gemini-1.5-pro** | 云端 | `GEMINI_API_KEY` | 长上下文 |
+| **gemini-1.5-flash** | 云端 | `GEMINI_API_KEY` | 快速便宜 |
+
+---
+
+## 环境变量参考
+
+| 变量 | 用途 |
+|------|------|
+| `MIMO_API_KEY` | MiMo API Key |
+| `MIMO_MODEL` | 切换默认视觉后端（默认: `mimo-v2.5`） |
+| `MIMO_BASE_URL` | 自定义 OpenAI 兼容地址 |
+| `OPENAI_API_KEY` | OpenAI API Key |
+| `OPENAI_BASE_URL` | 自定义 OpenAI 端点 |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API Key |
+| `ANTHROPIC_BASE_URL` | 自定义 Anthropic 端点 |
+| `GEMINI_API_KEY` | Google Gemini API Key |
+| `OLLAMA_HOST` | 自定义 Ollama 地址（默认: `http://localhost:11434`） |
+
+---
+
+## Always-on 模式
+
+将 `ALWAYS_ON.md` 注入系统提示词，让 AI **永远不会说"我看不见图片"**：
+
+```bash
+# Reasonix
+cp ALWAYS_ON.md ~/.reasonix/skills/ALWAYS_ON.md
+
+# Claude Code
+cat ALWAYS_ON.md >> ~/.claude/instructions.md
+
+# Cursor
+cp ALWAYS_ON.md .cursor/rules/
+```
+
+---
 
 ## 文件结构
 
 ```
 add-eyes-skills/
 ├── SKILL.md                        # Reasonix Skill 定义
-├── mimo_vision.py                  # 核心脚本（多模型视觉分析）
+├── ALWAYS_ON.md                    # Always-on 模式指令
+├── mimo_vision.py                  # 核心脚本（36KB，零依赖）
 ├── README.md                       # 本文件
 ├── LICENSE                         # MIT 许可证
+├── .gitignore
 ├── platforms/
 │   └── claude-code/
-│       └── SKILL.md                # Claude Code Skill 定义
+│       └── SKILL.md                # Claude Code Skill
 ├── .cursor/
 │   └── rules/
-│       └── mimo-vision.md          # Cursor 规则文件
+│       └── mimo-vision.md          # Cursor Rule
 └── .github/
     └── copilot-instructions.md     # GitHub Copilot 指令
 ```
 
+---
+
 ## 常见问题
 
-**Q: 提示 API Key 未设置？**
-
-A: 确保设置了对应的环境变量。使用 `python mimo_vision.py --list-models` 查看每个视觉后端需要的 Key 名称。
-
-**Q: 调用返回 401 / 认证失败？**
-
-A: API Key 可能无效或已过期。检查 Key 是否正确，以及账户余额是否充足。
+**Q: Ollama 安装后检测不到？**
+A: 确保 Ollama 已启动（`ollama serve`），然后运行 `python mimo_vision.py --detect-backends`。
 
 **Q: 图片太大？**
+A: 图片上限 10MB，支持 PNG/JPG/JPEG/GIF/WebP/BMP。
 
-A: 图片上限为 10MB。可以压缩后再尝试。
+**Q: 可以换视觉后端吗？**
+A: 可以，`--model ollama:minicpm-v`（本地）或 `--model gpt-4o`（云端）。
 
-**Q: 可以换别的视觉后端吗？**
+**Q: 支持视频吗？**
+A: 当前仅支持图片，视频支持计划中。
 
-A: 可以，通过 `--model` 参数指定。例如 `--model gpt-4o` 用 GPT-4o，`--model claude-3-5-sonnet-20241022` 用 Claude。
+**Q: OCR 降级需要什么？**
+A: `pip install pillow pytesseract easyocr`（可选，不装也不影响核心功能）。
+
+---
 
 ## License
 
