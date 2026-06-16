@@ -40,7 +40,7 @@ alwaysApply: false
 在终端中运行（在 add-eyes-skills 目录下）：
 
 ```bash
-python mimo_vision.py "<图片路径>" "<问题>" [--model <视觉后端>]
+python add_eyes.py "<图片路径>" "<问题>" [--model <视觉后端>]
 ```
 
 默认问题（用户无具体问题时）：
@@ -72,13 +72,13 @@ UI/前端截图的推荐问题：
 | `claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` | Claude 3.5 |
 | `gemini-1.5-pro` | `GEMINI_API_KEY` | Google |
 
-完整列表：`python mimo_vision.py --list-models`
+完整列表：`python add_eyes.py --list-models`
 
 ## OCR 降级（无 API Key 时）
 
 ```bash
 pip install pillow pytesseract easyocr
-python mimo_vision.py screenshot.png --ocr
+python add_eyes.py screenshot.png --ocr
 ```
 
 注意：`pytesseract` 还需要系统安装 [tesseract-ocr](https://github.com/tesseract-ocr/tesseract)。

@@ -8,14 +8,14 @@ Vision bridge for text-only LLMs (DeepSeek V4 Flash/Pro, etc.)
 让纯文本模型「看到」图片内容。
 
 Usage:
-  python mimo_vision.py <image_path> [question] [--model <backend>]
-  python mimo_vision.py - [question] [--model <backend>]  # read base64 from stdin
-  python mimo_vision.py screenshot.png
-  python mimo_vision.py screenshot.png "What is in this image?" --model gpt-4o
+  python add_eyes.py <image_path> [question] [--model <backend>]
+  python add_eyes.py - [question] [--model <backend>]  # read base64 from stdin
+  python add_eyes.py screenshot.png
+  python add_eyes.py screenshot.png "What is in this image?" --model gpt-4o
 
 Stdin formats (when image_path is "-"):
-  - Raw base64: echo "<base64>" | python mimo_vision.py - "describe" --type png
-  - Data URI:   echo "data:image/png;base64,<base64>" | python mimo_vision.py -
+  - Raw base64: echo "<base64>" | python add_eyes.py - "describe" --type png
+  - Data URI:   echo "data:image/png;base64,<base64>" | python add_eyes.py -
 
 Vision backends (via env config):
   Backend                Env Key              Env Base URL (optional)
@@ -187,8 +187,8 @@ def read_stdin_image(ext_hint=None):
     """Read base64 image data from stdin.
 
     Supports two formats:
-    1. Raw base64:  echo "<base64>" | python mimo_vision.py -
-    2. Data URI:    echo "data:image/png;base64,<base64>" | python mimo_vision.py -
+    1. Raw base64:  echo "<base64>" | python add_eyes.py -
+    2. Data URI:    echo "data:image/png;base64,<base64>" | python add_eyes.py -
 
     Returns (b64, mime) tuple.
     """

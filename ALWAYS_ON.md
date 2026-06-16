@@ -21,7 +21,7 @@
 收到用户消息后，立即检测是否包含图片：
 
 ```bash
-python "<skill_dir>/mimo_vision.py" --auto-route "<用户消息>"
+python "<skill_dir>/add_eyes.py" --auto-route "<用户消息>"
 ```
 
 如果返回 `needs_vision: true`，继续步骤 2。
@@ -29,7 +29,7 @@ python "<skill_dir>/mimo_vision.py" --auto-route "<用户消息>"
 ### 步骤 2：调用视觉分析
 
 ```bash
-python "<skill_dir>/mimo_vision.py" "<图片路径>" "<问题>" --model ollama:minicpm-v --context "<对话上下文>"
+python "<skill_dir>/add_eyes.py" "<图片路径>" "<问题>" --model ollama:minicpm-v --context "<对话上下文>"
 ```
 
 ### 步骤 3：融入回答

@@ -11,7 +11,7 @@ Execute the vision pipeline whenever:
 
 ```
 User pastes image → text-only model can't see it
-  → Call external vision API via mimo_vision.py
+  → Call external vision API via add_eyes.py
   → Get text description → model "sees" and responds
 ```
 
@@ -36,7 +36,7 @@ Priority order:
 ### Step 3: Run vision analysis
 
 ```bash
-python "<repo_root>/mimo_vision.py" "<image_path>" "<question>" [--model <backend>]
+python "<repo_root>/add_eyes.py" "<image_path>" "<question>" [--model <backend>]
 ```
 
 Default question when user has no specific one:
@@ -62,13 +62,13 @@ Process the returned text description with your own language capabilities — an
 | `claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` | Claude 3.5 |
 | `gemini-1.5-pro` | `GEMINI_API_KEY` | Google Gemini |
 
-List all: `python mimo_vision.py --list-models`
+List all: `python add_eyes.py --list-models`
 
 ## OCR Fallback (no API key)
 
 ```bash
 pip install pillow pytesseract easyocr
-python mimo_vision.py screenshot.png --ocr
+python add_eyes.py screenshot.png --ocr
 ```
 
 pytesseract requires system tesseract-ocr installation.

@@ -72,7 +72,7 @@ export ANTHROPIC_API_KEY='your-anthropic-key'
 **首次使用时，自动检测可用的视觉后端：**
 
 ```bash
-python "<skill_dir>/mimo_vision.py" --detect-backends
+python "<skill_dir>/add_eyes.py" --detect-backends
 ```
 
 **输出示例：**
@@ -93,7 +93,7 @@ python "<skill_dir>/mimo_vision.py" --detect-backends
 
 **使用推荐后端：**
 ```bash
-python mimo_vision.py screenshot.png "描述这张图" --model ollama:minicpm-v
+python add_eyes.py screenshot.png "描述这张图" --model ollama:minicpm-v
 ```
 
 ### 自动路由（备选）
@@ -101,7 +101,7 @@ python mimo_vision.py screenshot.png "描述这张图" --model ollama:minicpm-v
 如果不想注入系统提示词，可以使用自动路由：
 
 ```bash
-python "<skill_dir>/mimo_vision.py" --auto-route "<用户消息>"
+python "<skill_dir>/add_eyes.py" --auto-route "<用户消息>"
 ```
 
 **自动路由会：**
@@ -144,7 +144,7 @@ python "<skill_dir>/mimo_vision.py" --auto-route "<用户消息>"
 ### 步骤 3：执行视觉分析
 
 ```bash
-python "<skill_dir>/mimo_vision.py" "<absolute_image_path>" "<question>" [--model <vision_backend>] --context "<对话上下文>"
+python "<skill_dir>/add_eyes.py" "<absolute_image_path>" "<question>" [--model <vision_backend>] --context "<对话上下文>"
 ```
 
 **重要：使用 `--context` 参数传递对话上下文，启用智能提问！**
@@ -179,26 +179,26 @@ python "<skill_dir>/mimo_vision.py" "<absolute_image_path>" "<question>" [--mode
 
 查看完整列表：
 ```bash
-python "<skill_dir>/mimo_vision.py" --list-models
+python "<skill_dir>/add_eyes.py" --list-models
 ```
 
 ## 典型场景
 
 **场景 1：用户在讨论代码问题，然后贴了一张截图**
 ```bash
-python mimo_vision.py screenshot.png "帮我看看" --context "我在写一个 Python 函数，但是出现了 TypeError"
+python add_eyes.py screenshot.png "帮我看看" --context "我在写一个 Python 函数，但是出现了 TypeError"
 # 智能提问 → "请分析这张图片中的错误信息、异常堆栈或问题描述..."
 ```
 
 **场景 2：用户在讨论 UI 设计，然后贴了一张界面截图**
 ```bash
-python mimo_vision.py screenshot.png "帮我看看" --context "我在设计一个登录页面，但是布局有问题"
+python add_eyes.py screenshot.png "帮我看看" --context "我在设计一个登录页面，但是布局有问题"
 # 智能提问 → "请分析这个界面的布局结构、组件组成、颜色搭配..."
 ```
 
 **场景 3：用户在分析数据，然后贴了一张图表**
 ```bash
-python mimo_vision.py chart.png "帮我看看" --context "我在分析用户行为数据，但是图表看不懂"
+python add_eyes.py chart.png "帮我看看" --context "我在分析用户行为数据，但是图表看不懂"
 # 智能提问 → "请分析这张图片中的数据、图表或统计信息..."
 ```
 

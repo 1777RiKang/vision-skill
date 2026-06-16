@@ -65,7 +65,7 @@ export GEMINI_API_KEY='your-gemini-key'
 在项目根目录（`add-eyes-skills/`）下运行：
 
 ```bash
-python "<skill_dir>/mimo_vision.py" "<absolute_image_path>" "<question>" [--model <vision_backend>]
+python "<skill_dir>/add_eyes.py" "<absolute_image_path>" "<question>" [--model <vision_backend>]
 ```
 
 - 如果用户没有具体问题，用：`"请详细描述这张图片的内容，包括布局、颜色、文字、元素等。"`
@@ -90,28 +90,28 @@ python "<skill_dir>/mimo_vision.py" "<absolute_image_path>" "<question>" [--mode
 
 查看完整列表：
 ```bash
-python "<skill_dir>/mimo_vision.py" --list-models
+python "<skill_dir>/add_eyes.py" --list-models
 ```
 
 ## 典型场景
 
 **场景 1：用户贴了一张 UI 截图**
 ```
-你（文本模型）→ 看不见图 → 调用 mimo_vision.py
+你（文本模型）→ 看不见图 → 调用 add_eyes.py
   → 返回 "这是一个登录页面，顶部有 Logo，中间是用户名/密码输入框..."
 你 → "这是登录页面的截图。表单有两个输入框..."
 ```
 
 **场景 2：用户贴了报错截图**
 ```
-你 → 调用 mimo_vision.py
+你 → 调用 add_eyes.py
   → 返回 "终端显示 TypeError: undefined is not a function..."
 你 → "报错是 TypeError，原因是 xxx 变量未定义..."
 ```
 
 **场景 3：用户贴了架构图/流程图**
 ```
-你 → 调用 mimo_vision.py --model claude-sonnet-4-6
+你 → 调用 add_eyes.py --model claude-sonnet-4-6
   → 返回 "图中显示三层架构：前端 (React) → API 网关 → 微服务..."
 你 → 分析架构，给建议
 ```
