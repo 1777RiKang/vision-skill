@@ -97,7 +97,7 @@ cp .github/copilot-instructions.md .github/
 <summary><b>Reasonix</b></summary>
 
 ```bash
-install-capability source="./mimo-vision-skill"
+install-capability source="./add-eyes-skills"
 ```
 </details>
 
@@ -194,7 +194,7 @@ python mimo_vision.py screenshot.png --ocr
 ## 文件结构
 
 ```
-mimo-vision-skill/
+add-eyes-skills/
 ├── SKILL.md                        # Reasonix Skill 定义
 ├── mimo_vision.py                  # 核心脚本（多模型视觉分析）
 ├── README.md                       # 本文件

@@ -24,13 +24,13 @@ run_as: inline
 在 Reasonix 中运行：
 
 ```
-install-capability source="/path/to/mimo-vision-skill"
+install-capability source="/path/to/add-eyes-skills"
 ```
 
 ### 方式 2：从 GitHub 安装
 
 ```bash
-git clone https://github.com/<your-org>/mimo-vision-skill.git
+git clone https://github.com/1777RiKang/add-eyes-skills.git
 # 然后按方式 1 安装
 ```
 
@@ -59,7 +59,7 @@ export ANTHROPIC_API_KEY='your-anthropic-key'
 
 1. **Reasonix**：将 `ALWAYS_ON.md` 内容添加到系统提示词
 2. **Claude Code**：将 `ALWAYS_ON.md` 添加到 `.claude/instructions.md`
-3. **Cursor**：将 `ALWAYS_ON.md` 添加到 `.cursorrules`
+3. **Cursor**：将 `ALWAYS_ON.md` 添加到 `.cursor/rules/` 目录
 4. **GitHub Copilot**：将 `ALWAYS_ON.md` 添加到 `.github/copilot-instructions.md`
 
 **效果：**

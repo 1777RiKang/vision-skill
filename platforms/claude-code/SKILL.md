@@ -1,18 +1,10 @@
 ---
-name: vision
-description: Vision bridge for text-only models — delegates to external vision APIs when your model cannot see images. Use when user pastes/drops an image and the model lacks multimodal support.
-triggers:
-  - user pastes an image
-  - user drags a screenshot
-  - user says "看这张图" / "look at this image" / "这张截图"
-  - user asks about an image you can't see
-platforms:
-  - Claude Code
-  - Claude.ai
-  - Anthropic API
+name: add-eyes
+description: Vision bridge for text-only models — delegates to external vision APIs when your model cannot see images. Triggers when user pastes/drops an image, says "看这张图", "look at this image", or asks about an image you can't see. Supports Claude Code, Claude.ai, and Anthropic API.
+run_as: inline
 ---
 
-# MiMo Vision — 视觉桥接
+# Add Eyes — 视觉桥接
 
 ## 这是什么？
 
@@ -28,8 +20,8 @@ platforms:
 ## 安装
 
 ```bash
-git clone https://github.com/<your-org>/mimo-vision-skill.git
-cd mimo-vision-skill
+git clone https://github.com/1777RiKang/add-eyes-skills.git
+cd add-eyes-skills
 ```
 
 ### 配置 API Key（至少一个）
@@ -70,7 +62,7 @@ export GEMINI_API_KEY='your-gemini-key'
 
 ### 步骤 3：执行视觉分析
 
-在项目根目录（`mimo-vision-skill/`）下运行：
+在项目根目录（`add-eyes-skills/`）下运行：
 
 ```bash
 python "<skill_dir>/mimo_vision.py" "<absolute_image_path>" "<question>" [--model <vision_backend>]

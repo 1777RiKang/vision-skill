@@ -37,7 +37,7 @@ alwaysApply: false
 
 ### 3. 调用视觉分析
 
-在终端中运行（在 mimo-vision-skill 目录下）：
+在终端中运行（在 add-eyes-skills 目录下）：
 
 ```bash
 python mimo_vision.py "<图片路径>" "<问题>" [--model <视觉后端>]
