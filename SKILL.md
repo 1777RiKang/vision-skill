@@ -51,7 +51,77 @@ export ANTHROPIC_API_KEY='your-anthropic-key'
 
 ## 使用方式（给 AI Agent 的指令）
 
-当用户粘贴/拖放了一张图片，而**你正在运行的模型不支持多模态**时：
+### 🚀 Always-on 模式（推荐）
+
+**将 `ALWAYS_ON.md` 注入到系统提示词中，让 AI 永远不会说"我看不见图片"。**
+
+**安装方式：**
+
+1. **Reasonix**：将 `ALWAYS_ON.md` 内容添加到系统提示词
+2. **Claude Code**：将 `ALWAYS_ON.md` 添加到 `.claude/instructions.md`
+3. **Cursor**：将 `ALWAYS_ON.md` 添加到 `.cursorrules`
+4. **GitHub Copilot**：将 `ALWAYS_ON.md` 添加到 `.github/copilot-instructions.md`
+
+**效果：**
+- AI 永远不会说"我看不见图片"
+- 每次收到图片，自动调用 vision skill
+- 无需手动触发，完全自动化
+
+### 自动检测后端（推荐）
+
+**首次使用时，自动检测可用的视觉后端：**
+
+```bash
+python "<skill_dir>/mimo_vision.py" --detect-backends
+```
+
+**输出示例：**
+```json
+{
+  "available": ["ollama:minicpm-v", "mimo-v2.5", "gpt-4o"],
+  "recommended": "ollama:minicpm-v",
+  "details": {
+    "ollama:minicpm-v": {
+      "type": "local",
+      "model": "minicpm-v:latest",
+      "host": "http://localhost:11434",
+      "status": "available"
+    }
+  }
+}
+```
+
+**使用推荐后端：**
+```bash
+python mimo_vision.py screenshot.png "描述这张图" --model ollama:minicpm-v
+```
+
+### 自动路由（备选）
+
+如果不想注入系统提示词，可以使用自动路由：
+
+```bash
+python "<skill_dir>/mimo_vision.py" --auto-route "<用户消息>"
+```
+
+**自动路由会：**
+1. 检测消息中是否包含图片引用（`@.reasonix/attachments/xxx.png`）
+2. 检测消息中是否提到图片相关关键词（"看图"、"截图"、"分析这个"等）
+3. 如果需要视觉处理，返回 `{ "needs_vision": true, "image_paths": [...], "question": "...", "context": "..." }`
+4. 如果不需要视觉处理，返回 `{ "needs_vision": false }`
+
+**自动路由规则：**
+
+| 检测项 | 示例 | 触发 |
+|-------|------|------|
+| 图片引用 | `@.reasonix/attachments/screenshot.png` | ✅ |
+| 图片文件名 | `image.png`, `photo.jpg` | ✅ |
+| 视觉关键词 | "看这张图"、"分析截图"、"look at this" | ✅ |
+| 纯文本 | "帮我写个函数" | ❌ |
+
+### 手动调用（备选）
+
+如果自动路由返回 `needs_vision: true`，使用以下命令：
 
 ### 步骤 1：定位图片
 
@@ -74,11 +144,17 @@ export ANTHROPIC_API_KEY='your-anthropic-key'
 ### 步骤 3：执行视觉分析
 
 ```bash
-python "<skill_dir>/mimo_vision.py" "<absolute_image_path>" "<question>" [--model <vision_backend>]
+python "<skill_dir>/mimo_vision.py" "<absolute_image_path>" "<question>" [--model <vision_backend>] --context "<对话上下文>"
 ```
 
-- 如果用户没有具体问题，默认：`"请详细描述这张图片的内容，包括布局、颜色、文字、元素等。"`
-- 如果是 UI/前端截图，可以用：`"分析这个页面的布局结构"`
+**重要：使用 `--context` 参数传递对话上下文，启用智能提问！**
+
+- `--context` 会根据对话内容自动优化提问方式：
+  - 如果上下文涉及代码/编程 → 自动问"分析代码内容、语法错误、逻辑问题"
+  - 如果上下文涉及 UI/界面 → 自动问"分析布局结构、组件组成、交互元素"
+  - 如果上下文涉及数据/图表 → 自动问"分析数据类型、趋势、关键指标"
+  - 如果上下文涉及错误/调试 → 自动问"分析错误信息、异常堆栈、解决方案"
+- 如果没有 `--context`，使用默认问题
 - 用用户的交流语言提问（中文/英文）
 - **拿到文字描述后，用你自己的语言能力继续处理它**（比如分析、修复、重构等）
 
@@ -97,6 +173,9 @@ python "<skill_dir>/mimo_vision.py" "<absolute_image_path>" "<question>" [--mode
 | `claude-3-opus-20240229` | Anthropic | `ANTHROPIC_API_KEY` |
 | `gemini-1.5-pro` | Google | `GEMINI_API_KEY` |
 | `gemini-1.5-flash` | Google | `GEMINI_API_KEY` |
+| `ollama:minicpm-v` | 本地 Ollama | 无需 Key |
+| `ollama:llava` | 本地 Ollama | 无需 Key |
+| `ollama:moondream` | 本地 Ollama | 无需 Key |
 
 查看完整列表：
 ```bash
@@ -105,17 +184,22 @@ python "<skill_dir>/mimo_vision.py" --list-models
 
 ## 典型场景
 
-**场景 1：用户贴了一张 UI 截图**
-```
-你（文本模型）→ 看不见图 → 调用 Skill → 视觉后端返回
-  "这是一个登录页面，顶部有 Logo，中间是用户名/密码输入框..."
-你 → "这是登录页面的截图。表单有两个输入框..."
+**场景 1：用户在讨论代码问题，然后贴了一张截图**
+```bash
+python mimo_vision.py screenshot.png "帮我看看" --context "我在写一个 Python 函数，但是出现了 TypeError"
+# 智能提问 → "请分析这张图片中的错误信息、异常堆栈或问题描述..."
 ```
 
-**场景 2：用户贴了报错截图**
+**场景 2：用户在讨论 UI 设计，然后贴了一张界面截图**
+```bash
+python mimo_vision.py screenshot.png "帮我看看" --context "我在设计一个登录页面，但是布局有问题"
+# 智能提问 → "请分析这个界面的布局结构、组件组成、颜色搭配..."
 ```
-你 → 调用 Skill → "控制台显示 TypeError: undefined is not a function..."
-你 → "报错是 TypeError，原因是 xxx 变量未定义..."
+
+**场景 3：用户在分析数据，然后贴了一张图表**
+```bash
+python mimo_vision.py chart.png "帮我看看" --context "我在分析用户行为数据，但是图表看不懂"
+# 智能提问 → "请分析这张图片中的数据、图表或统计信息..."
 ```
 
 ## 注意事项

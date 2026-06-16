@@ -27,8 +27,18 @@ Vision backends (via env config):
   gemini-1.5-pro        GEMINI_API_KEY       GEMINI_BASE_URL
 """
 
+# ── Fix Windows terminal encoding for Chinese output ────────────────
 import sys
 import os
+import io
+
+if sys.platform == "win32":
+    # Force UTF-8 output on Windows
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    # Set console code page to UTF-8
+    os.system("chcp 65001 >nul 2>&1")
+
 import base64
 import json
 import argparse
@@ -120,6 +130,27 @@ MODEL_PRESETS = {
         "base_url_env": "GEMINI_BASE_URL",
         "default_base_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
         "max_tokens": 4096,
+    },
+    "ollama:minicpm-v": {
+        "api_key_env": None,
+        "base_url_env": "OLLAMA_HOST",
+        "default_base_url": "http://localhost:11434",
+        "max_tokens": 4096,
+        "ollama_model": "minicpm-v",
+    },
+    "ollama:llava": {
+        "api_key_env": None,
+        "base_url_env": "OLLAMA_HOST",
+        "default_base_url": "http://localhost:11434",
+        "max_tokens": 4096,
+        "ollama_model": "llava",
+    },
+    "ollama:moondream": {
+        "api_key_env": None,
+        "base_url_env": "OLLAMA_HOST",
+        "default_base_url": "http://localhost:11434",
+        "max_tokens": 4096,
+        "ollama_model": "moondream",
     },
 }
 
@@ -242,6 +273,19 @@ def build_gemini_payload(model_name, b64, mime, question, max_tokens):
     }
 
 
+def build_ollama_payload(model_name, b64, mime, question, max_tokens):
+    """Build payload for Ollama /api/generate API."""
+    return {
+        "model": model_name,
+        "prompt": question,
+        "images": [b64],
+        "stream": False,
+        "options": {
+            "num_predict": max_tokens,
+        },
+    }
+
+
 def ocr_fallback(image_path):
     """OCR fallback chain: easyocr → pytesseract → Pillow basic info.
 
@@ -324,7 +368,255 @@ def ocr_fallback(image_path):
     return result
 
 
-def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mime=None):
+def auto_route(message, attachments=None):
+    """Auto-detect if a message needs vision processing.
+
+    Analyzes the message content and attachments to determine if the user's
+    message contains images that need vision model processing.
+
+    Args:
+        message: User's message text
+        attachments: List of attachment paths (optional)
+
+    Returns:
+        dict with keys:
+            - needs_vision (bool): Whether vision processing is needed
+            - image_paths (list): List of image paths found
+            - question (str): Extracted question about the image
+            - context (str): Conversation context
+    """
+    result = {
+        "needs_vision": False,
+        "image_paths": [],
+        "question": "",
+        "context": "",
+    }
+
+    if not message:
+        return result
+
+    message_lower = message.lower()
+
+    # ── 1. Check attachments ──────────────────────────────────────
+    if attachments:
+        for path in attachments:
+            if path and os.path.isfile(path):
+                ext = Path(path).suffix.lower()
+                if ext in SUPPORTED_EXTS:
+                    result["needs_vision"] = True
+                    result["image_paths"].append(path)
+
+    # ── 2. Check for image references in message ──────────────────
+    # Pattern: @.reasonix/attachments/xxx.png
+    import re
+    attachment_pattern = r'@\.reasonix/attachments/[^\s]+\.(png|jpg|jpeg|gif|webp|bmp)'
+    matches = re.findall(attachment_pattern, message_lower)
+    if matches:
+        result["needs_vision"] = True
+        # Extract full paths
+        for match in re.finditer(r'@\.reasonix/attachments/[^\s]+\.(png|jpg|jpeg|gif|webp|bmp)', message):
+            result["image_paths"].append(match.group(0))
+
+    # ── 3. Check for image file references ────────────────────────
+    image_file_pattern = r'[^\s]+\.(png|jpg|jpeg|gif|webp|bmp)'
+    file_matches = re.findall(image_file_pattern, message_lower)
+    if file_matches:
+        result["needs_vision"] = True
+
+    # ── 4. Check for vision-related keywords ──────────────────────
+    vision_keywords = [
+        # Chinese
+        "看这张图", "看图", "图片", "截图", "界面", "页面", "图表", "设计稿",
+        "帮我看看", "分析这个", "这是什么", "识别", "读取图片", "看看这个",
+        # English
+        "look at this", "image", "screenshot", "picture", "diagram", "chart",
+        "analyze this", "what is this", "see this", "check this",
+    ]
+
+    for keyword in vision_keywords:
+        if keyword in message_lower:
+            result["needs_vision"] = True
+            break
+
+    # ── 5. Extract question and context ───────────────────────────
+    # Try to separate question from context
+    lines = message.strip().split('\n')
+    if len(lines) > 1:
+        # Multi-line: last line is likely the question, rest is context
+        result["context"] = '\n'.join(lines[:-1])
+        result["question"] = lines[-1]
+    else:
+        # Single line: the whole message is the question
+        result["question"] = message
+        result["context"] = ""
+
+    # ── 6. If we found images but no clear question, use default ──
+    if result["needs_vision"]:
+        # Check if question is just a file path (no real question)
+        is_just_path = (
+            not result["question"] or
+            result["question"].endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')) or
+            '@.reasonix/attachments/' in result["question"]
+        )
+        if is_just_path:
+            result["question"] = "请详细描述这张图片的内容，包括布局、颜色、文字、元素等。"
+            result["context"] = result["question"]  # Use the path as context
+
+    return result
+
+
+def auto_detect_backends():
+    """Auto-detect available vision backends.
+
+    Checks for available vision backends by testing:
+    1. Ollama (local) - check if running and models available
+    2. Cloud APIs - check environment variables for API keys
+    3. Custom endpoints - check for custom base URLs
+
+    Returns:
+        dict with keys:
+            - available (list): List of available backend names
+            - recommended (str): Recommended backend name
+            - details (dict): Detailed info about each backend
+    """
+    available = []
+    details = {}
+
+    # ── 1. Check Ollama (local) ───────────────────────────────────
+    try:
+        import urllib.request
+        import json
+
+        # Check if Ollama is running
+        ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        req = urllib.request.Request(f"{ollama_host}/api/tags")
+        req.method = "GET"
+
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            models = result.get("models", [])
+
+            # Check for vision models
+            vision_models = ["minicpm-v", "llava", "moondream"]
+            for model in models:
+                model_name = model.get("name", "").lower()
+                for vision_model in vision_models:
+                    if vision_model in model_name:
+                        backend_name = f"ollama:{vision_model}"
+                        available.append(backend_name)
+                        details[backend_name] = {
+                            "type": "local",
+                            "model": model_name,
+                            "host": ollama_host,
+                            "status": "available",
+                        }
+    except Exception:
+        pass
+
+    # ── 2. Check Cloud APIs ───────────────────────────────────────
+    cloud_backends = [
+        ("mimo-v2.5", "MIMO_API_KEY", "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"),
+        ("gpt-4o", "OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions"),
+        ("gpt-4-turbo", "OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions"),
+        ("claude-3-5-sonnet-20241022", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/messages"),
+        ("claude-sonnet-4-6", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/messages"),
+        ("gemini-1.5-pro", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"),
+        ("gemini-1.5-flash", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"),
+    ]
+
+    for backend_name, api_key_env, default_url in cloud_backends:
+        api_key = os.environ.get(api_key_env, "")
+        if api_key:
+            base_url_env = f"{backend_name.split('-')[0].upper()}_BASE_URL"
+            base_url = os.environ.get(base_url_env, default_url)
+
+            available.append(backend_name)
+            details[backend_name] = {
+                "type": "cloud",
+                "api_key_env": api_key_env,
+                "base_url": base_url,
+                "status": "available",
+            }
+
+    # ── 3. Determine recommended backend ──────────────────────────
+    # Priority: local > cloud
+    recommended = None
+
+    # Prefer local models (no API key needed, faster)
+    for backend in available:
+        if backend.startswith("ollama:"):
+            recommended = backend
+            break
+
+    # Fallback to cloud models
+    if not recommended and available:
+        recommended = available[0]
+
+    return {
+        "available": available,
+        "recommended": recommended,
+        "details": details,
+    }
+
+
+def smart_question(question, context=None):
+    """Generate a smart question based on user context.
+
+    Analyzes the conversation context to generate more targeted questions
+    for the vision model, improving accuracy of image analysis.
+
+    Args:
+        question: Original user question
+        context: Conversation context (optional)
+
+    Returns:
+        Enhanced question for the vision model
+    """
+    if not context:
+        return question
+
+    # Analyze context keywords
+    context_lower = context.lower()
+    question_lower = question.lower()
+
+    # Code/programming related
+    code_keywords = ["代码", "code", "bug", "error", "错误", "调试", "debug", "函数", "function",
+                     "变量", "variable", "类", "class", "方法", "method", "接口", "api", "接口",
+                     "数据库", "database", "sql", "查询", "query", "框架", "framework", "库", "library"]
+
+    # UI/frontend related
+    ui_keywords = ["界面", "ui", "界面", "design", "设计", "布局", "layout", "组件", "component",
+                   "样式", "style", "css", "html", "前端", "frontend", "页面", "page", "截图", "screenshot"]
+
+    # Data/analysis related
+    data_keywords = ["数据", "data", "图表", "chart", "分析", "analysis", "统计", "statistics",
+                     "指标", "metric", "报告", "report", "趋势", "trend", "可视化", "visualization"]
+
+    # Error/debugging related
+    error_keywords = ["错误", "error", "异常", "exception", "bug", "问题", "issue", "失败", "fail",
+                      "崩溃", "crash", "日志", "log", "调试", "debug", "堆栈", "stack"]
+
+    # Check if context matches any category
+    is_code_context = any(kw in context_lower for kw in code_keywords)
+    is_ui_context = any(kw in context_lower for kw in ui_keywords)
+    is_data_context = any(kw in context_lower for kw in data_keywords)
+    is_error_context = any(kw in context_lower for kw in error_keywords)
+
+    # Generate enhanced question
+    if is_error_context:
+        return f"请分析这张图片中的错误信息、异常堆栈或问题描述。重点关注错误类型、错误消息、发生位置和可能的解决方案。原始问题：{question}"
+    elif is_code_context:
+        return f"请分析这张图片中的代码内容。识别代码语言、函数结构、变量定义、逻辑流程，并指出可能的语法错误或逻辑问题。原始问题：{question}"
+    elif is_ui_context:
+        return f"请分析这个界面的布局结构、组件组成、颜色搭配、字体样式和交互元素。识别可能的UI问题或改进建议。原始问题：{question}"
+    elif is_data_context:
+        return f"请分析这张图片中的数据、图表或统计信息。识别数据类型、趋势、关键指标和异常值。原始问题：{question}"
+    else:
+        # Default: use original question
+        return question
+
+
+def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mime=None, context=None):
     """Send image to the configured vision model and return the answer.
 
     Args:
@@ -333,9 +625,14 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
         model_name: Vision backend model name.
         b64:       Pre-encoded base64 image data (used with mime).
         mime:      MIME type (e.g. "image/png") when using b64.
+        context:   Conversation context for smart question generation.
 
     One of image_path or (b64 + mime) must be provided.
     """
+
+    # ── Smart question generation ──────────────────────────────────
+    if context:
+        question = smart_question(question, context)
 
     # ── File size / data size check ────────────────────────────────
     if image_path:
@@ -362,14 +659,20 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
         # User must set MIMO_API_KEY (or override via env)
         preset = DEFAULT_CONFIG.copy()
 
-    api_key = os.environ.get(preset["api_key_env"], "")
-    if not api_key:
-        raise EnvironmentError(
-            f"{preset['api_key_env']} not set.\n"
-            f"Run (PowerShell): $env:{preset['api_key_env']}='your-key'\n"
-            f"Or (bash): export {preset['api_key_env']}=your-key\n\n"
-            f"Tip: Use --ocr for offline OCR fallback (requires: pip install pillow pytesseract easyocr)"
-        )
+    # ── Check if this is an Ollama model (no API key needed) ──────
+    is_ollama = model_name.startswith("ollama:")
+
+    if not is_ollama:
+        api_key = os.environ.get(preset.get("api_key_env", ""), "")
+        if not api_key:
+            raise EnvironmentError(
+                f"{preset.get('api_key_env')} not set.\n"
+                f"Run (PowerShell): $env:{preset.get('api_key_env')}='your-key'\n"
+                f"Or (bash): export {preset.get('api_key_env')}=your-key\n\n"
+                f"Tip: Use --ocr for offline OCR fallback (requires: pip install pillow pytesseract easyocr)"
+            )
+    else:
+        api_key = None  # Ollama doesn't need an API key
 
     base_url_env = preset.get("base_url_env")
     base_url = (
@@ -385,8 +688,17 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
     # ── Detect API type and build payload ─────────────────────────
     is_anthropic = "anthropic" in model_name.lower() or "claude" in model_name.lower()
     is_gemini = "gemini" in model_name.lower()
+    is_ollama = model_name.startswith("ollama:")
 
-    if is_anthropic:
+    if is_ollama:
+        # Ollama models
+        ollama_model = preset.get("ollama_model", model_name.split(":", 1)[1])
+        payload = build_ollama_payload(ollama_model, b64, mime, question, max_tokens)
+        headers = {
+            "Content-Type": "application/json",
+        }
+        base_url = f"{base_url}/api/generate"
+    elif is_anthropic:
         payload = build_anthropic_payload(model_name, b64, mime, question, max_tokens)
         headers = {
             "Content-Type": "application/json",
@@ -432,7 +744,12 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
         ) from e
 
     # ── Parse response by API type ────────────────────────────────
-    if is_anthropic:
+    if is_ollama:
+        # Ollama response format
+        response = result.get("response", "")
+        return response or "(no text output)"
+
+    elif is_anthropic:
         content_blocks = result.get("content", [])
         text_parts = [
             block.get("text", "")
@@ -483,6 +800,9 @@ def main():
                         help=f"Vision backend to use (default: mimo-v2.5)")
     parser.add_argument("--ocr", action="store_true",
                         help="Use OCR fallback when no vision API key is set (requires: pip install pillow pytesseract easyocr)")
+    parser.add_argument("--context", "-c",
+                        default=None,
+                        help="Conversation context for smart question generation")
     parser.add_argument("--list-models", action="store_true",
                         help="List supported vision backends and exit")
     parser.add_argument("--verbose", "-v", action="store_true",
@@ -490,18 +810,44 @@ def main():
     parser.add_argument("--type", "-t",
                         default=None,
                         help="Image format hint for stdin mode: png, jpg, jpeg, gif, webp, bmp")
+    parser.add_argument("--auto-route", "-ar",
+                        default=None,
+                        help="Auto-detect if a message needs vision processing (returns JSON)")
+    parser.add_argument("--detect-backends", "-db",
+                        action="store_true",
+                        help="Auto-detect available vision backends (returns JSON)")
 
     args = parser.parse_args()
+
+    # ── Auto-route mode ───────────────────────────────────────────
+    if args.auto_route:
+        result = auto_route(args.auto_route)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    # ── Detect backends mode ──────────────────────────────────────
+    if args.detect_backends:
+        result = auto_detect_backends()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
 
     if args.list_models:
         print("Supported vision backends:")
         print(f"  {'Backend':<35} {'API Key Env':<20} {'Default Base URL'}")
         print("  " + "-" * 100)
         for name, cfg in MODEL_PRESETS.items():
-            print(f"  {name:<35} {cfg['api_key_env']:<20} {cfg['default_base_url']}")
+            api_key_env = cfg.get('api_key_env', 'None')
+            if api_key_env is None:
+                api_key_env = 'None (local)'
+            print(f"  {name:<35} {api_key_env:<20} {cfg['default_base_url']}")
         print()
         print("Set env var MIMO_MODEL=<model> to change default.")
         print("Or use --model <name> for one-off usage.")
+        print()
+        print("Ollama models (local, no API key needed):")
+        print("  ollama:minicpm-v    - MiniCPM-V 2.6 (8B, recommended)")
+        print("  ollama:llava        - LLaVA 1.6 (7B)")
+        print("  ollama:moondream    - Moondream (1.7B, lightweight)")
         return
 
     if not args.image_path:
@@ -515,6 +861,8 @@ def main():
             print(f"[img]   (stdin)")
             print(f"[ask]   {args.question}")
             print(f"[model] {args.model}")
+            if args.context:
+                print(f"[ctx]   {args.context[:50]}...")
             if args.type:
                 print(f"[type]  {args.type}")
             print("-" * 50)
@@ -528,6 +876,7 @@ def main():
                 b64=b64, mime=mime,
                 question=args.question,
                 model_name=args.model,
+                context=args.context,
             )
         except EnvironmentError as e:
             print(f"Error: {e}")
@@ -544,12 +893,14 @@ def main():
         print(f"[img]   {args.image_path}")
         print(f"[ask]   {args.question}")
         print(f"[model] {args.model}")
+        if args.context:
+            print(f"[ctx]   {args.context[:50]}...")
         if args.ocr:
             print(f"[ocr]   enabled (fallback when no API key)")
         print("-" * 50)
 
     try:
-        answer = ask_with_image(args.image_path, args.question, args.model)
+        answer = ask_with_image(args.image_path, args.question, args.model, context=args.context)
     except EnvironmentError:
         # No API key set — try OCR fallback if --ocr is enabled
         if args.ocr:
