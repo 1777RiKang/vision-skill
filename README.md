@@ -26,15 +26,17 @@
 
 | 功能 | 说明 |
 |------|------|
+| 🔌 **MCP 服务器** | 模型自动发现视觉工具，主动调用（`see_image` / `detect_backends`） |
 | 🚀 **Always-on 模式** | 注入系统提示词，AI 永远不会说"我看不见图片" |
 | 🔍 **自动检测后端** | 启动时自动检测可用的视觉后端，无需手动配置 |
 | 🧠 **智能提问** | 根据对话上下文自动优化提问（代码/UI/数据/错误场景） |
+| 🎯 **区域聚焦** | 自动/手动聚焦图片特定区域（`--focus 左上` / `--region "0,0,0.5,0.5"`） |
 | 🎯 **自动路由** | 自动检测消息是否需要视觉处理 |
 | 🖼️ **13 个视觉后端** | 云端 + 本地，覆盖 MiMo/GPT/Claude/Gemini/Ollama |
 | 🏠 **本地模型** | Ollama (MiniCPM-V/LLaVA/Moondream)，免费+隐私 |
 | 📝 **OCR 降级** | 无 API Key 时自动降级为 OCR 文字提取 |
-| 🔄 **自动重试** | 指数退避重试，5xx/网络错误自动恢复 |
-| 🌐 **多平台** | Reasonix、Claude Code、Cursor、GitHub Copilot |
+| 🔄 **自动重试** | 指数退避重试，429/5xx/网络错误自动恢复 |
+| 🌐 **多平台** | MCP、Reasonix、Claude Code、Cursor、GitHub Copilot |
 | 🔒 **核心零依赖** | 纯 Python 标准库即可运行（高级功能如 OCR/区域聚焦需可选依赖） |
 
 ---
