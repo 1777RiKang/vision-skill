@@ -372,6 +372,9 @@ add-eyes-skills/
 
 ## 常见问题
 
+**Q: MCP 和 ALWAYS_ON.md 有什么区别？该用哪个？**
+A: MCP 是**主方案**，让模型自动发现工具并主动调用。ALWAYS_ON.md 是**兜底方案**，用于不支持 MCP 的平台。**二选一即可**：有 MCP 的客户端（Claude Code、Cursor）用 MCP；没有 MCP 的客户端（Reasonix）用 ALWAYS_ON.md。同时配置不会冲突，但 MCP 效果更好。
+
 **Q: MCP 配置后模型还是说"看不见图片"？**
 A: 确保 MCP 服务器路径正确，重启 AI 客户端。MCP 工具需要客户端启动时加载。
 

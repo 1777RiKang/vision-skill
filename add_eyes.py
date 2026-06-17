@@ -1210,6 +1210,12 @@ def main():
     parser.add_argument("--version", "-V",
                         action="version",
                         version="Add Eyes Skills v2.1.0")
+    parser.add_argument("--timeout",
+                        type=int, default=120,
+                        help="API request timeout in seconds (default: 120)")
+    parser.add_argument("--output", "-o",
+                        default=None,
+                        help="Write result to file instead of stdout (e.g. --output result.txt)")
 
     args = parser.parse_args()
 
@@ -1330,7 +1336,12 @@ def main():
             answer = ocr_fallback(args.image_path)
         else:
             raise  # Re-raise the original error
-    print(answer)
+    if args.output:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            f.write(answer)
+        print(f"[saved] Result written to: {args.output}")
+    else:
+        print(answer)
 
 
 if __name__ == "__main__":
