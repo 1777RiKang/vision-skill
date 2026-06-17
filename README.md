@@ -153,6 +153,41 @@ python add_eyes.py diagram.png "解释这张架构图" --model gpt-4o
 python add_eyes.py screenshot.png "分析这个界面" --model ollama:minicpm-v
 ```
 
+### 区域聚焦分析 ✨
+
+分析图片中特定区域，提高精度：
+
+```bash
+# 聚焦左上角
+python add_eyes.py screenshot.png "这是什么？" --focus 左上
+
+# 聚焦右下角
+python add_eyes.py screenshot.png "分析这个区域" --focus 右下
+
+# 聚焦中间区域
+python add_eyes.py screenshot.png "这是什么内容？" --focus 中间
+
+# 使用坐标精确裁剪（像素）
+python add_eyes.py screenshot.png "分析这个按钮" --region "100,200,300,250"
+
+# 使用百分比坐标（0-1）
+python add_eyes.py screenshot.png "分析左侧区域" --region "0,0,0.5,1"
+```
+
+**支持的聚焦关键词：**
+
+| 中文 | 英文 | 区域 |
+|------|------|------|
+| 左上/左上角 | top-left | 左上 1/4 |
+| 右上/右上角 | top-right | 右上 1/4 |
+| 左下/左下角 | bottom-left | 左下 1/4 |
+| 右下/右下角 | bottom-right | 右下 1/4 |
+| 顶部 | top | 上 1/3 |
+| 底部 | bottom | 下 1/3 |
+| 左侧 | left | 左半边 |
+| 右侧 | right | 右半边 |
+| 中间 | center | 中心 1/2 |
+
 ### 智能提问（带上下文）
 
 ```bash

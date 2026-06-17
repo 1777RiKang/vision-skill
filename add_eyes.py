@@ -233,6 +233,95 @@ def encode_image(path):
     return data, mime
 
 
+def crop_region(image_path, region=None, focus=None):
+    """Crop image to a specific region for focused analysis.
+
+    Args:
+        image_path: Path to the image file.
+        region: Tuple (x1, y1, x2, y2) in pixels or percentages (0-1).
+        focus: Keyword like "左上", "右下", "中间", "top", "bottom", etc.
+
+    Returns:
+        Tuple of (cropped_base64, mime) or original (base64, mime) if no crop.
+    """
+    # If neither region nor focus specified, return original
+    if not region and not focus:
+        return encode_image(image_path)
+
+    try:
+        from PIL import Image
+    except ImportError:
+        # Pillow not available, return original
+        return encode_image(image_path)
+
+    img = Image.open(image_path)
+    w, h = img.size
+
+    if region:
+        # Parse region: can be (x1, y1, x2, y2) in pixels or percentages
+        x1, y1, x2, y2 = region
+        # If values are <= 1, treat as percentages
+        if all(0 <= v <= 1 for v in [x1, y1, x2, y2]):
+            x1, y1, x2, y2 = int(x1 * w), int(y1 * h), int(x2 * w), int(y2 * h)
+        # Clamp to image bounds
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(w, x2), min(h, y2)
+        cropped = img.crop((x1, y1, x2, y2))
+
+    elif focus:
+        # Keyword-based region selection
+        focus_lower = focus.lower()
+        regions = {
+            # Chinese
+            "左上": (0, 0, 0.5, 0.5),
+            "右上": (0.5, 0, 1, 0.5),
+            "左下": (0, 0.5, 0.5, 1),
+            "右下": (0.5, 0.5, 1, 1),
+            "顶部": (0, 0, 1, 0.33),
+            "底部": (0, 0.67, 1, 1),
+            "左侧": (0, 0, 0.5, 1),
+            "右侧": (0.5, 0, 1, 1),
+            "中间": (0.25, 0.25, 0.75, 0.75),
+            "左上角": (0, 0, 0.5, 0.5),
+            "右上角": (0.5, 0, 1, 0.5),
+            "左下角": (0, 0.5, 0.5, 1),
+            "右下角": (0.5, 0.5, 1, 1),
+            # English
+            "top-left": (0, 0, 0.5, 0.5),
+            "top-right": (0.5, 0, 1, 0.5),
+            "bottom-left": (0, 0.5, 0.5, 1),
+            "bottom-right": (0.5, 0.5, 1, 1),
+            "top": (0, 0, 1, 0.33),
+            "bottom": (0, 0.67, 1, 1),
+            "left": (0, 0, 0.5, 1),
+            "right": (0.5, 0, 1, 1),
+            "center": (0.25, 0.25, 0.75, 0.75),
+        }
+
+        # Find matching region
+        box = None
+        for keyword, bbox in regions.items():
+            if keyword in focus_lower:
+                box = bbox
+                break
+
+        if box:
+            x1, y1, x2, y2 = [int(v * dim) for v, dim in zip(box, [w, h, w, h])]
+            cropped = img.crop((x1, y1, x2, y2))
+        else:
+            # Unknown focus keyword, return original
+            return encode_image(image_path)
+    else:
+        return encode_image(image_path)
+
+    # Encode cropped image
+    import io
+    buffer = io.BytesIO()
+    cropped.save(buffer, format="PNG")
+    b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return b64, "image/png"
+
+
 def build_openai_payload(model_name, b64, mime, question, max_tokens):
     """Build payload for OpenAI-compatible chat/completions API."""
     return {
@@ -695,7 +784,7 @@ def smart_question(question, context=None):
         return question
 
 
-def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mime=None, context=None):
+def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mime=None, context=None, region=None, focus=None):
     """Send image to the configured vision model and return the answer.
 
     Args:
@@ -705,6 +794,8 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
         b64:       Pre-encoded base64 image data (used with mime).
         mime:      MIME type (e.g. "image/png") when using b64.
         context:   Conversation context for smart question generation.
+        region:    Crop region tuple (x1, y1, x2, y2).
+        focus:     Focus area keyword (e.g. "左上", "center").
 
     One of image_path or (b64 + mime) must be provided.
     """
@@ -760,9 +851,12 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
 
     max_tokens = preset.get("max_tokens", DEFAULT_CONFIG["max_tokens"])
 
-    # ── Encode image ──────────────────────────────────────────────
+    # ── Encode image (with optional region crop) ─────────────────
     if image_path:
-        b64, mime = encode_image(image_path)
+        if region or focus:
+            b64, mime = crop_region(image_path, region, focus)
+        else:
+            b64, mime = encode_image(image_path)
 
     # ── Detect API type and build payload ─────────────────────────
     is_anthropic = "anthropic" in model_name.lower() or "claude" in model_name.lower()
@@ -912,6 +1006,12 @@ def main():
     parser.add_argument("--context", "-c",
                         default=None,
                         help="Conversation context for smart question generation")
+    parser.add_argument("--region", "-r",
+                        default=None,
+                        help="Crop region: x1,y1,x2,y2 (pixels or 0-1 percentages, e.g. '0,0,0.5,0.5' for top-left)")
+    parser.add_argument("--focus", "-f",
+                        default=None,
+                        help="Focus area keyword: 左上/右上/左下/右下/顶部/底部/中间/左侧/右侧 (or English: top-left/bottom-right/center/etc.)")
     parser.add_argument("--list-models", action="store_true",
                         help="List supported vision backends and exit")
     parser.add_argument("--verbose", "-v", action="store_true",
@@ -1008,12 +1108,28 @@ def main():
         print(f"[model] {args.model}")
         if args.context:
             print(f"[ctx]   {args.context[:50]}...")
+        if args.region:
+            print(f"[region] {args.region}")
+        if args.focus:
+            print(f"[focus]  {args.focus}")
         if args.ocr:
             print(f"[ocr]   enabled (fallback when no API key)")
         print("-" * 50)
 
+    # Parse region if provided
+    region = None
+    if args.region:
+        try:
+            region = tuple(float(x.strip()) for x in args.region.split(","))
+            if len(region) != 4:
+                raise ValueError
+        except ValueError:
+            print(f"Error: --region must be x1,y1,x2,y2 (e.g. '0,0,0.5,0.5')")
+            sys.exit(1)
+
     try:
-        answer = ask_with_image(args.image_path, args.question, args.model, context=args.context)
+        answer = ask_with_image(args.image_path, args.question, args.model,
+                                context=args.context, region=region, focus=args.focus)
     except (EnvironmentError, RuntimeError) as e:
         # EnvironmentError: No API key set
         # RuntimeError: Network error or API error
