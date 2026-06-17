@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "add-eyes-skills"
+version = "2.0.0"
+description = "Vision bridge for text-only LLMs — let DeepSeek V4, MiMo V2.5 Pro, etc. see images via external vision APIs"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "1777RiKang"},
+]
+keywords = [
+    "vision",
+    "llm",
+    "ai-agent",
+    "image-analysis",
+    "ocr",
+    "deepseek",
+    "mimo",
+    "claude-code",
+    "cursor",
+    "reasonix",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+[project.urls]
+Homepage = "https://github.com/1777RiKang/add-eyes-skills"
+Repository = "https://github.com/1777RiKang/add-eyes-skills"
+Issues = "https://github.com/1777RiKang/add-eyes-skills/issues"
+
+[project.scripts]
+add-eyes = "add_eyes_skill:main"
+
+[project.optional-dependencies]
+ocr = [
+    "pillow>=9.0",
+    "pytesseract>=0.3.10",
+    "easyocr>=1.7",
+]
+full = [
+    "pillow>=9.0",
+    "pytesseract>=0.3.10",
+    "easyocr>=1.7",
+]
+
+[tool.setuptools]
+packages = ["add_eyes_skill"]
