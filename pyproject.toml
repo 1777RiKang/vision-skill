@@ -46,7 +46,7 @@ Repository = "https://github.com/1777RiKang/add-eyes-skills"
 Issues = "https://github.com/1777RiKang/add-eyes-skills/issues"
 
 [project.scripts]
-add-eyes = "add_eyes_skill:main"
+add-eyes = "add_eyes:main"
 
 [project.optional-dependencies]
 ocr = [
@@ -54,11 +54,6 @@ ocr = [
     "pytesseract>=0.3.10",
     "easyocr>=1.7",
 ]
-full = [
-    "pillow>=9.0",
-    "pytesseract>=0.3.10",
-    "easyocr>=1.7",
-]
 
 [tool.setuptools]
-packages = ["add_eyes_skill"]
+py-modules = ["add_eyes"]
