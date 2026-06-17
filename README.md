@@ -50,7 +50,7 @@ cd add-eyes-skills
 
 ### 2. 配置视觉后端（至少一个）
 
-**方案 A：本地模型（推荐，免费，隐私）**
+**方案 A：本地模型（推荐，免费，隐私，无地域限制）**
 
 ```bash
 # 安装 Ollama：https://ollama.ai
@@ -59,18 +59,17 @@ ollama pull minicpm-v
 
 **方案 B：云端 API**
 
+> ⚠️ 默认后端 MiMo 需要国内网络访问。海外用户请配置 OpenAI、Claude 或 Gemini Key。
+
 ```bash
-# MiMo（推荐，国内直连，性价比高）
+# MiMo（国内直连，性价比高）
 # PowerShell:
 $env:MIMO_API_KEY = 'your-mimo-key'
 # bash:
 export MIMO_API_KEY='your-mimo-key'
 
-# 或 OpenAI
+# 海外用户推荐 OpenAI / Claude / Gemini
 export OPENAI_API_KEY='your-openai-key'
-
-# 或 Claude
-export ANTHROPIC_API_KEY='your-anthropic-key'
 ```
 
 ### 3. 检测可用后端
@@ -307,7 +306,7 @@ cp ALWAYS_ON.md .cursor/rules/
 add-eyes-skills/
 ├── SKILL.md                        # Reasonix Skill 定义
 ├── ALWAYS_ON.md                    # Always-on 模式指令
-├── add_eyes.py                  # 核心脚本（36KB，零依赖）
+├── add_eyes.py                  # 核心脚本（零外部依赖，高级功能需可选依赖）
 ├── README.md                       # 本文件
 ├── LICENSE                         # MIT 许可证
 ├── .gitignore

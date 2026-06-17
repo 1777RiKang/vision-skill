@@ -1,4 +1,4 @@
-# ALWAYS_ON.md — 视觉能力永久指令
+# ALWAYS_ON.md — 视觉桥接永久指令
 
 ## 核心规则
 

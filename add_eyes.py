@@ -88,10 +88,14 @@ def _find_preset(model_name):
         if prefix in MODEL_PRESETS:
             return MODEL_PRESETS[prefix]
 
-    # Try matching by model family (e.g. "gpt-4o-xxx" -> "gpt-4o")
+    # Try matching by model family (e.g. "gpt-4o-2024-01-01" -> "gpt-4o")
+    # Only match if the next char after preset_name is a delimiter or end-of-string
+    # This prevents "gpt-4o-mini" from matching "gpt-4o"
     for preset_name, preset in MODEL_PRESETS.items():
         if model_name.startswith(preset_name):
-            return preset
+            rest = model_name[len(preset_name):]
+            if not rest or rest[0] in "-_.":
+                return preset
 
     return None
 
@@ -317,12 +321,22 @@ def crop_region(image_path, region=None, focus=None):
     else:
         return encode_image(image_path)
 
-    # Encode cropped image
+    # Encode cropped image — preserve original format to avoid bloat
     import io
     buffer = io.BytesIO()
-    cropped.save(buffer, format="PNG")
+    ext = Path(image_path).suffix.lower()
+    if ext in (".jpg", ".jpeg"):
+        cropped = cropped.convert("RGB")  # JPEG doesn't support alpha
+        cropped.save(buffer, format="JPEG", quality=90)
+        mime_type = "image/jpeg"
+    elif ext == ".webp":
+        cropped.save(buffer, format="WEBP", quality=90)
+        mime_type = "image/webp"
+    else:
+        cropped.save(buffer, format="PNG")
+        mime_type = "image/png"
     b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return b64, "image/png"
+    return b64, mime_type
 
 
 def build_openai_payload(model_name, b64, mime, question, max_tokens):
@@ -959,7 +973,7 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
     # ── Detect API type and build payload ─────────────────────────
     is_anthropic = "anthropic" in model_name.lower() or "claude" in model_name.lower()
     is_gemini = "gemini" in model_name.lower()
-    is_ollama = model_name.startswith("ollama:")
+    # is_ollama already defined above at line 942
 
     if is_ollama:
         # Ollama models
@@ -1067,7 +1081,8 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
     elif is_gemini:
         candidates = result.get("candidates", [])
         if not candidates:
-            return f"(no candidates returned)\nRaw: {json.dumps(result, indent=2, ensure_ascii=False)}"
+            # Don't leak raw API response (may contain keys, internal IDs)
+            return "(no candidates returned — API returned empty response)"
         parts = candidates[0].get("content", {}).get("parts", [])
         text_parts = [p.get("text", "") for p in parts]
         return "\n".join(text_parts) or "(no text output)"
@@ -1076,7 +1091,7 @@ def ask_with_image(image_path=None, question=None, model_name=None, b64=None, mi
         # OpenAI-compatible
         choices = result.get("choices", [])
         if not choices:
-            return f"(no choices returned)\nRaw: {json.dumps(result, indent=2, ensure_ascii=False)}"
+            return "(no choices returned — API returned empty response)"
         message = choices[0].get("message", {})
         content = message.get("content", "")
         reasoning = message.get("reasoning_content", "")
@@ -1114,7 +1129,7 @@ def main():
                         help="Crop region: x1,y1,x2,y2 (pixels or 0-1 percentages, e.g. '0,0,0.5,0.5' for top-left)")
     parser.add_argument("--focus", "-f",
                         default=None,
-                        help="Focus area keyword: 左上/右上/左下/右下/顶部/底部/中间/左侧/右侧 (or English: top-left/bottom-right/center/etc.)")
+                        help="Focus area keyword: 左上/右上/左下/右下/顶部/底部/中间/左侧/右侧 (or English). Use 'none' to disable auto-focus.")
     parser.add_argument("--list-models", action="store_true",
                         help="List supported vision backends and exit")
     parser.add_argument("--verbose", "-v", action="store_true",
