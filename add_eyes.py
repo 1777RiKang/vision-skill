@@ -1209,7 +1209,7 @@ def main():
                         help="Auto-detect available vision backends (returns JSON)")
     parser.add_argument("--version", "-V",
                         action="version",
-                        version="Add Eyes Skills v2.0.0")
+                        version="Add Eyes Skills v2.1.0")
 
     args = parser.parse_args()
 
