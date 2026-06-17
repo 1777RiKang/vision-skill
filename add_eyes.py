@@ -785,6 +785,8 @@ def smart_question(question, context=None):
                      "框架", "framework", "库", "library"]
 
     # UI/frontend
+    # Note: "组件"/"component" is ambiguous — in debugging context it means "React component has a bug",
+    # not "UI design component". We'll filter it out when error is already detected.
     ui_keywords = ["界面", "ui", "design", "设计", "布局", "layout",
                    "组件", "component", "样式", "style", "css", "html",
                    "前端", "frontend", "页面", "page", "截图", "screenshot",
@@ -806,8 +808,20 @@ def smart_question(question, context=None):
         detected.append("error")
     if any(kw in context_lower for kw in code_keywords):
         detected.append("code")
-    if any(kw in context_lower for kw in ui_keywords):
+
+    # UI detection with disambiguation:
+    # When error is already detected, exclude ambiguous words like "组件"/"component"
+    # that could mean "React component has a bug" rather than "UI design"
+    ui_detected = False
+    if "error" in detected:
+        # Stricter: exclude ambiguous UI words in debugging context
+        ui_strict = [kw for kw in ui_keywords if kw not in ("组件", "component")]
+        ui_detected = any(kw in context_lower for kw in ui_strict)
+    else:
+        ui_detected = any(kw in context_lower for kw in ui_keywords)
+    if ui_detected:
         detected.append("ui")
+
     if any(kw in context_lower for kw in data_keywords):
         detected.append("data")
 
@@ -828,8 +842,9 @@ def smart_question(question, context=None):
         hints.append(error_patterns[0].strip())
 
     # Try to extract tech stack mentions
+    # Use (?<![A-Za-z]) instead of \b because \b doesn't work between CJK and Latin chars
     tech_patterns = re.findall(
-        r'\b(React|Vue|Angular|Next\.js|Nuxt|Django|Flask|FastAPI|Express|Spring|Laravel|Tailwind|Bootstrap|TypeScript|JavaScript|Python|Java|Go|Rust)\b',
+        r'(?<![A-Za-z])(React|Vue|Angular|Next\.js|Nuxt|Django|Flask|FastAPI|Express|Spring|Laravel|Tailwind|Bootstrap|TypeScript|JavaScript|Python|Java|Go|Rust)(?![A-Za-z])',
         context, re.IGNORECASE
     )
     if tech_patterns:
