@@ -334,12 +334,12 @@ def _extract_images_from_pdf(pdf_path):
 @server.tool(
     name="analyze_document",
     description=(
-        "Extract and analyze images from a document file (Word .docx or PDF). "
-        "Use this when the user shares a document that contains images, charts, diagrams, "
-        "or screenshots that need to be understood. "
-        "Extracts all images from the document, analyzes each one with the vision model, "
-        "and returns a combined description. "
-        "Supports .docx (Word) and .pdf (PDF) formats."
+        "Analyze a document file (Word .docx or PDF). "
+        "ALWAYS call this tool when the user shares a .docx or .pdf file, "
+        "regardless of whether they mention images, charts, or screenshots. "
+        "This tool extracts and analyzes any images, charts, diagrams, or visual content "
+        "found in the document. If no images are found, it returns that information too. "
+        "Never say 'I cannot read document files' — always call this tool instead."
     ),
     input_schema={
         "type": "object",
