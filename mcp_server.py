@@ -290,6 +290,135 @@ def detect_backends_tool(format: str = "json") -> str:
         return f"Error detecting backends: {e}"
 
 
+# ── Helper: extract images from documents ───────────────────────────
+def _extract_images_from_docx(docx_path):
+    """Extract images from a .docx file."""
+    import zipfile
+    import tempfile
+    images = []
+    with zipfile.ZipFile(docx_path, 'r') as z:
+        for f in z.namelist():
+            if f.startswith('word/media/') and any(f.lower().endswith(ext) for ext in ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+                filename = os.path.basename(f)
+                tmp_path = os.path.join(tempfile.gettempdir(), f"add_eyes_doc_{filename}")
+                with open(tmp_path, 'wb') as out:
+                    out.write(z.read(f))
+                images.append(tmp_path)
+    return images
+
+
+def _extract_images_from_pdf(pdf_path):
+    """Extract images from a PDF file (requires PyMuPDF)."""
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        return []
+    
+    doc = fitz.open(pdf_path)
+    images = []
+    import tempfile
+    
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        for img_index, img in enumerate(page.get_images(full=True)):
+            xref = img[0]
+            base_image = doc.extract_image(xref)
+            ext = base_image["ext"]
+            tmp_path = os.path.join(tempfile.gettempdir(), f"add_eyes_pdf_p{page_num}_i{img_index}.{ext}")
+            with open(tmp_path, 'wb') as out:
+                out.write(base_image["image"])
+            images.append(tmp_path)
+    
+    return images
+
+
+# ── Tool: analyze_document ──────────────────────────────────────────
+@server.tool(
+    name="analyze_document",
+    description=(
+        "Extract and analyze images from a document file (Word .docx or PDF). "
+        "Use this when the user shares a document that contains images, charts, diagrams, "
+        "or screenshots that need to be understood. "
+        "Extracts all images from the document, analyzes each one with the vision model, "
+        "and returns a combined description. "
+        "Supports .docx (Word) and .pdf (PDF) formats."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_path": {
+                "type": "string",
+                "description": "Absolute path to the document file (.docx or .pdf)",
+            },
+            "question": {
+                "type": "string",
+                "description": "What to analyze in the document images",
+                "default": "请详细描述这张图片的内容，包括布局、颜色、文字、元素等。",
+            },
+            "model": {
+                "type": "string",
+                "description": "Vision backend to use (default: auto-detect)",
+                "default": "",
+            },
+            "max_images": {
+                "type": "integer",
+                "description": "Maximum number of images to analyze (default: 10)",
+                "default": 10,
+            },
+        },
+        "required": ["file_path"],
+    },
+)
+def analyze_document(file_path: str, question: str = "", model: str = "", max_images: int = 10) -> str:
+    """Extract and analyze images from a document."""
+    if not question:
+        question = "请详细描述这张图片的内容，包括布局、颜色、文字、元素等。"
+    if not model:
+        model = os.environ.get("MIMO_MODEL", "ollama:minicpm-v")
+
+    if not os.path.isfile(file_path):
+        return f"Error: File not found: {file_path}"
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    # Extract images
+    if ext == '.docx':
+        images = _extract_images_from_docx(file_path)
+    elif ext == '.pdf':
+        images = _extract_images_from_pdf(file_path)
+        if not images:
+            return "Error: Could not extract images from PDF. Install PyMuPDF: pip install pymupdf"
+    else:
+        return f"Error: Unsupported format '{ext}'. Supported: .docx, .pdf"
+
+    if not images:
+        return f"No images found in {os.path.basename(file_path)}"
+
+    # Limit images
+    images = images[:max_images]
+
+    # Analyze each image
+    results = []
+    for i, img_path in enumerate(images):
+        try:
+            result = ask_with_image(
+                image_path=img_path,
+                question=question,
+                model_name=model,
+            )
+            results.append(f"## 图片 {i+1}/{len(images)}\n{result}")
+        except Exception as e:
+            results.append(f"## 图片 {i+1}/{len(images)}\nError: {e}")
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(img_path)
+            except OSError:
+                pass
+
+    return f"文档 {os.path.basename(file_path)} 共提取 {len(images)} 张图片:\n\n" + "\n\n".join(results)
+
+
 # ── Entry point ─────────────────────────────────────────────────────
 def main():
     """Run the MCP server."""
