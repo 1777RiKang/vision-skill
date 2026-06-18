@@ -55,6 +55,15 @@ ocr = [
     "pytesseract>=0.3.10",
     "easyocr>=1.7",
 ]
+pdf = [
+    "pymupdf>=1.23",
+]
+full = [
+    "pillow>=9.0",
+    "pytesseract>=0.3.10",
+    "easyocr>=1.7",
+    "pymupdf>=1.23",
+]
 
 [tool.setuptools]
 py-modules = ["add_eyes", "mcp_server"]

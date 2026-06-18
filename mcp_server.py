@@ -299,11 +299,10 @@ def _extract_images_from_docx(docx_path):
     with zipfile.ZipFile(docx_path, 'r') as z:
         for f in z.namelist():
             if f.startswith('word/media/') and any(f.lower().endswith(ext) for ext in ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
-                filename = os.path.basename(f)
-                tmp_path = os.path.join(tempfile.gettempdir(), f"add_eyes_doc_{filename}")
-                with open(tmp_path, 'wb') as out:
-                    out.write(z.read(f))
-                images.append(tmp_path)
+                ext = os.path.splitext(f)[1]
+                with tempfile.NamedTemporaryFile(suffix=ext, prefix="add_eyes_doc_", delete=False) as tmp:
+                    tmp.write(z.read(f))
+                    images.append(tmp.name)
     return images
 
 
@@ -312,7 +311,7 @@ def _extract_images_from_pdf(pdf_path):
     try:
         import fitz  # PyMuPDF
     except ImportError:
-        return []
+        return None  # None = PyMuPDF not installed (distinct from [] = no images found)
     
     doc = fitz.open(pdf_path)
     images = []
@@ -324,12 +323,11 @@ def _extract_images_from_pdf(pdf_path):
             xref = img[0]
             base_image = doc.extract_image(xref)
             ext = base_image["ext"]
-            tmp_path = os.path.join(tempfile.gettempdir(), f"add_eyes_pdf_p{page_num}_i{img_index}.{ext}")
-            with open(tmp_path, 'wb') as out:
-                out.write(base_image["image"])
-            images.append(tmp_path)
+            with tempfile.NamedTemporaryFile(suffix=f".{ext}", prefix="add_eyes_pdf_", delete=False) as tmp:
+                tmp.write(base_image["image"])
+                images.append(tmp.name)
     
-    return images
+    return images  # Empty list = PDF has no images
 
 
 # ── Tool: analyze_document ──────────────────────────────────────────
@@ -360,6 +358,12 @@ def _extract_images_from_pdf(pdf_path):
                 "description": "Vision backend to use (default: auto-detect)",
                 "default": "",
             },
+            "context": {
+                "type": "string",
+                "description": "Conversation context for smart question enhancement. "
+                               "E.g. 'analyzing a data science report with charts' or 'reviewing a technical architecture document'.",
+                "default": "",
+            },
             "max_images": {
                 "type": "integer",
                 "description": "Maximum number of images to analyze (default: 10)",
@@ -369,7 +373,7 @@ def _extract_images_from_pdf(pdf_path):
         "required": ["file_path"],
     },
 )
-def analyze_document(file_path: str, question: str = "", model: str = "", max_images: int = 10) -> str:
+def analyze_document(file_path: str, question: str = "", model: str = "", context: str = "", max_images: int = 10) -> str:
     """Extract and analyze images from a document."""
     if not question:
         question = "请详细描述这张图片的内容，包括布局、颜色、文字、元素等。"
@@ -386,8 +390,10 @@ def analyze_document(file_path: str, question: str = "", model: str = "", max_im
         images = _extract_images_from_docx(file_path)
     elif ext == '.pdf':
         images = _extract_images_from_pdf(file_path)
+        if images is None:
+            return "Error: PyMuPDF not installed. Install it: pip install pymupdf"
         if not images:
-            return "Error: Could not extract images from PDF. Install PyMuPDF: pip install pymupdf"
+            return f"PDF {os.path.basename(file_path)} has no embedded images."
     else:
         return f"Error: Unsupported format '{ext}'. Supported: .docx, .pdf"
 
@@ -405,6 +411,7 @@ def analyze_document(file_path: str, question: str = "", model: str = "", max_im
                 image_path=img_path,
                 question=question,
                 model_name=model,
+                context=context if context else None,
             )
             results.append(f"## 图片 {i+1}/{len(images)}\n{result}")
         except Exception as e:
