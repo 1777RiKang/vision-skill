@@ -39,6 +39,7 @@ if sys.platform == "win32":
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # ── Import core logic from add_eyes.py ──────────────────────────────
+import re
 # Try to import from the same directory first
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
